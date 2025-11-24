@@ -119,6 +119,75 @@ app.post('/shopify/orders-paid', async (req, res) => {
   }
 });
 
+// 简单允许前端跨域读取（只读 GET，足够用）
+app.use((req, res, next) => {
+  // 把域名改成你的店铺域名，例如 https://thcomalaysia.com
+  res.setHeader('Access-Control-Allow-Origin', 'https://thcomalaysia.com');
+  next();
+});
+
+// 通过 email 查询钱包积分
+app.get('/wallet/by-email', async (req, res) => {
+  try {
+    const email = req.query.email;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'email is required',
+      });
+    }
+
+    // 1️⃣ 查用户
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (userError) {
+      console.error('Supabase user error:', userError);
+      return res.status(500).json({ success: false, message: 'User lookup failed' });
+    }
+
+    if (!user) {
+      // 没有这个用户，返回 0 积分
+      return res.json({
+        success: true,
+        email,
+        name: null,
+        hasWallet: false,
+        points: 0,
+        lifetime_points: 0,
+      });
+    }
+
+    // 2️⃣ 查钱包
+    const { data: wallet, error: walletError } = await supabase
+      .from('wallets')
+      .select('points, lifetime_points')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (walletError) {
+      console.error('Supabase wallet error:', walletError);
+      return res.status(500).json({ success: false, message: 'Wallet lookup failed' });
+    }
+
+    return res.json({
+      success: true,
+      email: user.email,
+      name: user.name,
+      hasWallet: !!wallet,
+      points: wallet?.points ?? 0,
+      lifetime_points: wallet?.lifetime_points ?? 0,
+    });
+  } catch (err) {
+    console.error('GET /wallet/by-email error:', err);
+    return res.status(500).json({ success: false, message: 'Unexpected error' });
+  }
+});
+
 app.listen(3000, () => {
   console.log("🚀 THCO Wallet API running on port 3000");
 });
