@@ -34,7 +34,9 @@ function getJson(req) {
 }
 
 function calcPoints(totalPrice) {
-  return Math.floor(parseFloat(totalPrice)); // RM1 = 1 point
+  const amount = parseFloat(totalPrice) || 0;
+  const rate = 3; // 每 RM1 = 3 积分
+  return Math.floor(amount * rate);
 }
 
 app.post('/shopify/orders-paid', async (req, res) => {
